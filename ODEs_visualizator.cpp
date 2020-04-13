@@ -1,105 +1,8 @@
-#include <vtkInteractorStyleUnicam.h>
-#include <vtkInteractorStyleJoystickCamera.h>
-#include <vtkInteractorStyleTrackballCamera.h>
-#include <chrono>
-#include <vtkMultiThreader.h>
-
-#include <iostream>
-
-#include <vtkVersion.h>
-#include <vtkSmartPointer.h>
-#include <vtkPolyData.h>
-#include <vtkPolyDataMapper.h>
-#include <vtkActor.h>
-#include <vtkRenderWindow.h>
-#include <vtkRenderer.h>
-#include <vtkRenderWindowInteractor.h>
-#include <vtkInteractorStyleTrackballCamera.h>
-#include <vtkSphereSource.h>
-#include <vtkElevationFilter.h>
-#include <vtkVectorText.h>
-#include <vtkCommand.h>
-#include <iostream>
-#include <fstream>
-#include <vector>
-#include <fstream>
-#include <sstream>
-#include <cstdio>
-#include <vector>
-
-#include <vtkSmartPointer.h>
-#include <vtkPolyDataMapper.h>
-#include <vtkActor.h>
-#include <vtkProperty.h>
-#include <vtkRenderer.h>
-#include <vtkRenderWindow.h>
-#include <vtkRenderWindowInteractor.h>
-#include <vtkQuaternion.h>
-#include <vtkTransform.h>
-#include "vtkPoints.h"
-#include "vtkCellArray.h"
-#include "vtkObjectFactory.h"
-#include "vtkPoints.h"
-#include "vtkPolyData.h"
-#include "vtkSmartPointer.h"
-
-//CoordinateSystem
-#include <vtkAxesActor.h>
-#include <vtkCamera.h>
-#include <vtkCaptionActor2D.h>
-#include <vtkNamedColors.h>
-#include <vtkPolyData.h>
-#include <vtkPolyDataMapper.h>
-#include <vtkTextProperty.h>
-#include <vtkTransform.h>
-
-//Spline
-#include <vtkKochanekSpline.h>
-#include <vtkParametricSpline.h>
-#include <vtkParametricFunctionSource.h>
-#include <vtkProperty.h>
-#include <vtkGlyph3DMapper.h>
-#include <vtkNamedColors.h>
-
-//Plane
-#include <vtkPlaneSource.h>
-#include <vtkLegendBoxActor.h>
-#include <vtkTransformPolyDataFilter.h>
-
-//Animation
-#include <vtkProgrammableFilter.h>
-#include <vtkCommand.h>
-#include <vtkInteractorStyle.h>
-#include <vtkInteractorStyleTrackballCamera.h>
-#include <vtkCallbackCommand.h>
-#include <vtkDataSetAttributes.h>
-
-#include <string>
-#include <array>
-
-#include "vtkPolyDataAlgorithm.h"
-
-#include <vtkCellArray.h>
-#include <vtkDoubleArray.h>
-#include <vtkPointData.h>
-#include <vtkPoints.h>
-#include <vtkPolyData.h>
-#include <vtkPolyDataWriter.h>
-#include <vtkSmartPointer.h>
-#include <vtkVertex.h>
-
-#include <cmath>
-
-#include <vtkHedgeHog.h>
-
-#include <vtkGlyph3D.h>
-
-#include <vtkArrowSource.h>
-#include <vtkLookupTable.h>
-
+#include "resultsreader.h"
 
 int timePointsProcessedCounter=1;
 bool animStart=false;
+
 
 void KeypressCallbackFunction ( vtkObject* caller, long unsigned int vtkNotUsed(eventId), void* vtkNotUsed(clientData), void* vtkNotUsed(callData) )
 {
@@ -112,7 +15,7 @@ void KeypressCallbackFunction ( vtkObject* caller, long unsigned int vtkNotUsed(
   {
         //startTime = std::chrono::steady_clock::now();
     //    iren->CreateOneShotTimer(1);
-        iren->CreateRepeatingTimer(50);
+        iren->CreateRepeatingTimer(1);
         animStart=true;
   }
 }
@@ -121,6 +24,7 @@ struct MeshParameters{
     int nx, ny, nz, nt;
     double xMax, yMax, zMax, xMin,yMin, zMin, tMin, tMax;
 };
+
 
 void generatePoints(const MeshParameters& meshParam,
                     const vtkSmartPointer<vtkPoints>& points,
@@ -146,11 +50,13 @@ void generatePoints(const MeshParameters& meshParam,
     }
 }
 
+
 void evaluateFunction(const double t, const double (&position)[3], double (&result)[3]){
-    result[0] = sin((1+1*t/10)*(position[1]-position[0]));
-    result[1] = cos((1+1*t/10)*position[0]*(50-position[2])-position[1]);
-    result[2] = (1+1*t/10)*position[0]*position[1]-75*position[2];
+    result[0] = 10.0*(position[1] - position[0]);
+    result[1] = 28.0*position[0] - position[1]-position[0]*position[2];
+    result[2] = -(8.00/3.00)*position[2] + position[0]*position[1];
 }
+
 
 void generateVectorFieldAtT(const vtkSmartPointer<vtkPolyData>& polyDataPoints,
                             const vtkSmartPointer<vtkDoubleArray>& vectorField, const double& t,
@@ -185,18 +91,48 @@ void generateVectorFieldAtT(const vtkSmartPointer<vtkPolyData>& polyDataPoints,
         polyDataPoints->GetPointData()->Update();
 }
 
+
+void updateSpline(const double (&pos)[3], const vtkSmartPointer<vtkParametricSpline>& spline,
+                  const vtkSmartPointer<vtkParametricFunctionSource>& functionSource,
+                  const vtkSmartPointer<vtkPoints>& points)
+{
+    points->InsertNextPoint(pos);
+
+    spline->SetNumberOfPoints(points->GetNumberOfPoints());
+    spline->SetPoints(points);
+
+    functionSource->SetParametricFunction(spline);
+    functionSource->SetUResolution(50 * points->GetNumberOfPoints());
+    functionSource->SetVResolution(50 * points->GetNumberOfPoints());
+    functionSource->SetWResolution(50 * points->GetNumberOfPoints());
+    functionSource->Update();
+}
+
+
 struct CallBackParameters{
     vtkSmartPointer<vtkPolyData> polyDataPoints;
     vtkSmartPointer<vtkDoubleArray> vectorField;
     std::vector<double> timeVector;
     vtkSmartPointer<vtkPolyDataMapper> polyDataMapper;
 
+    vtkSmartPointer<vtkParametricSpline> spline;
+    vtkSmartPointer<vtkParametricFunctionSource> functionSource;
+    vtkSmartPointer<vtkPoints> pointsSpline;
+    std::vector<ResultsLine> results;
+
     CallBackParameters(const vtkSmartPointer<vtkPolyData>& polyDataPoints_, const vtkSmartPointer<vtkDoubleArray>& vectorField_,
-                       const std::vector<double>& timeVector_, const vtkSmartPointer<vtkPolyDataMapper>& polyDataMapper_):
+                       const std::vector<double>& timeVector_, const vtkSmartPointer<vtkPolyDataMapper>& polyDataMapper_,
+                       const     vtkSmartPointer<vtkParametricSpline>& spline_,
+                       const vtkSmartPointer<vtkParametricFunctionSource>& functionSource_,
+                       vtkSmartPointer<vtkPoints> pointsSpline_, const std::vector<ResultsLine>& results_):
         polyDataPoints(polyDataPoints_),
         vectorField(vectorField_),
         timeVector(timeVector_),
-        polyDataMapper(polyDataMapper_)
+        polyDataMapper(polyDataMapper_),
+        spline(spline_),
+        functionSource(functionSource_),
+        pointsSpline(pointsSpline_),
+        results(results_)
         {}
 };
 
@@ -206,11 +142,14 @@ void TimerCallbackFunction ( vtkObject* caller, long unsigned int vtkNotUsed(eve
     vtkRenderWindowInteractor *iren = static_cast<vtkRenderWindowInteractor*>(caller);
 
 if(timePointsProcessedCounter<params->timeVector.size()){
+    updateSpline(params->results[timePointsProcessedCounter].pos, params->spline, params->functionSource,
+                 params->pointsSpline);
+
     vtkSmartPointer<vtkLookupTable> colorLookupTable = vtkSmartPointer<vtkLookupTable>::New();
     generateVectorFieldAtT(params->polyDataPoints, params->vectorField,
                            params->timeVector[timePointsProcessedCounter], colorLookupTable);
 
-    //params->polyDataPoints->GetPointData()->SetVectors(params->vectorField);
+ //params->polyDataPoints->GetPointData()->SetVectors(params->vectorField);
    // params->polyDataPoints->GetPointData()->SetActiveScalars("Magnitudes");
    // params->polyDataMapper->SetLookupTable(colorLookupTable);
   //  params->polyDataMapper->SetScalarRange(params->polyDataPoints->GetScalarRange());
@@ -223,8 +162,50 @@ if(timePointsProcessedCounter<params->timeVector.size()){
 
 
 
-int main()
+int main(int argc, char* argv[])
 {
+
+    // Verify input arguments
+    if ( argc != 2 )
+    {
+      std::cout << "Usage: " << argv[0]
+                << " Filename(.xyz)" << std::endl;
+      return EXIT_FAILURE;
+    }
+
+  // Read the file
+    ResultsReader reader;
+    std::vector<ResultsLine> results;
+    //Reads the data, and exits in case there were any problem while reading points
+    if (reader.read(std::string(argv[1]), results)==0){return 0;};
+
+
+    //Points
+        // Allocate objects to hold points and vertex cells.
+        vtkSmartPointer<vtkPoints> pointsSpline = vtkSmartPointer<vtkPoints>::New();
+        vtkSmartPointer<vtkCellArray> vertsSpline = vtkSmartPointer<vtkCellArray>::New();
+        //Allocate memory for the polydata formed from the previous points and cells
+        vtkSmartPointer<vtkPolyData> polyDataPointsSpline = vtkSmartPointer<vtkPolyData>::New();
+        //Allocate memory for the  Mapper for the Points PolyData
+        vtkSmartPointer<vtkPolyDataMapper> mapperPointsSpline = vtkSmartPointer<vtkPolyDataMapper>::New();
+        //Allocate memory for the Points actor
+        vtkSmartPointer<vtkActor> actorPointsSpline = vtkSmartPointer<vtkActor>::New();
+
+
+    //VISUALIZATION AND FIRST FRAME CREATION
+    //Points
+        vtkIdType id = pointsSpline->InsertNextPoint(results.begin()->pos);
+        vertsSpline->InsertNextCell(1, &id);
+        polyDataPointsSpline->SetPoints(pointsSpline);
+        polyDataPointsSpline->SetVerts(vertsSpline);
+
+        //Create Points PolyData Mapper
+        mapperPointsSpline->SetInputData(polyDataPointsSpline);
+        //Create Points PolyData actor
+        actorPointsSpline->SetMapper(mapperPointsSpline);
+        actorPointsSpline->GetProperty()->SetPointSize(2);
+
+
 
 //Generation of the base mesh
 vtkSmartPointer<vtkPoints> points = vtkSmartPointer<vtkPoints>::New();
@@ -233,21 +214,72 @@ vtkSmartPointer<vtkPolyData> polyDataPoints = vtkSmartPointer<vtkPolyData>::New(
 MeshParameters meshParams;
 std::vector<double> timeVector;
 
+double xMinMax[2];
+double yMinMax[2];
+double zMinMax[2];
+
+
+for (uint i=0; i<results.size(); i++){
+    if(i == 0){
+        xMinMax[0] = results[i].pos[0];
+        xMinMax[1] = results[i].pos[0];
+    }
+    else if(results[i].pos[0] < xMinMax[0]){
+        xMinMax[0] = results[i].pos[0];
+    }
+    else if(results[i].pos[0] > xMinMax[1]){
+        xMinMax[1] = results[i].pos[0];
+    }
+}
+
+cout << xMinMax[0] << "   " << xMinMax[1] << endl;
+
+for (uint i=0; i<results.size(); i++){
+    if(i == 0){
+        yMinMax[0] = results[i].pos[1];
+        yMinMax[1] = results[i].pos[1];
+    }
+    else if(results[i].pos[1] < yMinMax[0]){
+        yMinMax[0] = results[i].pos[1];
+    }
+    else if(results[i].pos[1] > yMinMax[1]){
+        yMinMax[1] = results[i].pos[1];
+    }
+}
+
+cout << yMinMax[0] << "   " << yMinMax[1] << endl;
+
+for (uint i=0; i<results.size(); i++){
+    if(i == 0){
+        zMinMax[0] = results[i].pos[2];
+        zMinMax[1] = results[i].pos[2];
+    }
+    else if(results[i].pos[2] < xMinMax[0]){
+        zMinMax[0] = results[i].pos[2];
+    }
+    else if(results[i].pos[2] > xMinMax[1]){
+        zMinMax[1] = results[i].pos[2];
+    }
+}
+
+cout << zMinMax[0] << "   " << zMinMax[1] << endl;
+
+
 meshParams.nx = 10;
 meshParams.ny = 10;
 meshParams.nz = 10;
-meshParams.nt = 500;
+meshParams.nt = results.size();
 
-meshParams.xMin = -100;
-meshParams.yMin = -100;
-meshParams.zMin = -100;
+meshParams.xMin = 1.1*xMinMax[0];
+meshParams.yMin = 1.1*yMinMax[0];
+meshParams.zMin = 1.1*zMinMax[0];
 
-meshParams.xMax = 100;
-meshParams.yMax = 100;
-meshParams.zMax = 100;
+meshParams.xMax = 1.1*xMinMax[1];
+meshParams.yMax = 1.1*yMinMax[1];
+meshParams.zMax = 1.1*zMinMax[1];
 
 meshParams.tMin=0;
-meshParams.tMax=100;
+meshParams.tMax=results.end()->t;
 
 //It generates the mesh of spatial and temporal points
 generatePoints(meshParams, points, verts, polyDataPoints, timeVector);
@@ -342,7 +374,7 @@ generatePoints(meshParams, points, verts, polyDataPoints, timeVector);
     //Allocate memory for the Points actor
     vtkSmartPointer<vtkActor> actorPoints = vtkSmartPointer<vtkActor>::New();
 
-/**Spline
+//**Spline
     //Allocate memory for all the splines and related functions
     vtkSmartPointer<vtkKochanekSpline> xSpline = vtkSmartPointer<vtkKochanekSpline>::New();
     vtkSmartPointer<vtkKochanekSpline> ySpline = vtkSmartPointer<vtkKochanekSpline>::New();
@@ -351,12 +383,24 @@ generatePoints(meshParams, points, verts, polyDataPoints, timeVector);
     vtkSmartPointer<vtkParametricFunctionSource> functionSource = vtkSmartPointer<vtkParametricFunctionSource>::New();
     //Allocates memory for the Spline's actor and mapper
     vtkSmartPointer<vtkPolyDataMapper> mapperSpline = vtkSmartPointer<vtkPolyDataMapper>::New();
-    vtkSmartPointer<vtkActor> actorSpline = vtkSmartPointer<vtkActor>::New();*/
+    vtkSmartPointer<vtkActor> actorSpline = vtkSmartPointer<vtkActor>::New();//*/
 
-//Renderer and windows
-    vtkSmartPointer<vtkRenderer> renderer = vtkSmartPointer<vtkRenderer>::New();
-    vtkSmartPointer<vtkRenderWindow> renderWindow = vtkSmartPointer<vtkRenderWindow>::New();
-    vtkSmartPointer<vtkRenderWindowInteractor> renderWindowInteractor = vtkSmartPointer<vtkRenderWindowInteractor>::New();
+    //Spline - In the first frame there is not passed path, only initial position
+      spline->SetXSpline(xSpline);
+      spline->SetYSpline(ySpline);
+      spline->SetZSpline(zSpline);
+      spline->SetPoints(pointsSpline);
+
+      functionSource->SetParametricFunction(spline);
+      functionSource->SetUResolution(50 * points->GetNumberOfPoints());
+      functionSource->SetVResolution(50 * points->GetNumberOfPoints());
+      functionSource->SetWResolution(50 * points->GetNumberOfPoints());
+      functionSource->Update();
+
+      mapperSpline->SetInputConnection(functionSource->GetOutputPort());
+      actorSpline->SetMapper(mapperSpline);
+      actorSpline->GetProperty()->SetColor(colors->GetColor3d("DarkSlateGrey").GetData());
+      actorSpline->GetProperty()->SetLineWidth(3.0);
 
 //VISUALIZATION AND FIRST FRAME CREATION
     //Create Points PolyData Mapper
@@ -365,37 +409,16 @@ generatePoints(meshParams, points, verts, polyDataPoints, timeVector);
     actorPoints->SetMapper(mapperPoints);
     actorPoints->GetProperty()->SetPointSize(2);
 
-/**Spline - In the first frame there is not passed path, only initial position
-  spline->SetXSpline(xSpline);
-  spline->SetYSpline(ySpline);
-  spline->SetZSpline(zSpline);
-  spline->SetPoints(points);
-
-  functionSource->SetParametricFunction(spline);
-  functionSource->SetUResolution(50 * points->GetNumberOfPoints());
-  functionSource->SetVResolution(50 * points->GetNumberOfPoints());
-  functionSource->SetWResolution(50 * points->GetNumberOfPoints());
-  functionSource->Update();
-
-  mapperSpline->SetInputConnection(functionSource->GetOutputPort());
-  actorSpline->SetMapper(mapperSpline);
-  actorSpline->GetProperty()->SetColor(colors->GetColor3d("DarkSlateGrey").GetData());
-  actorSpline->GetProperty()->SetLineWidth(3.0);
-
-
-  //Creates the initial structures that will be passed to the function called by the timer callback,
-  //containing the objects to be updated
-  UpdateParametersArguments updateParametersArguments(spline, functionSource, points, results, polyDataPoints,
-                                                      verts, actorAxes, transform);
-  void* arguments = static_cast<void*>(&updateParametersArguments);
-*/
+    //Renderer and windows
+     vtkSmartPointer<vtkRenderer> renderer = vtkSmartPointer<vtkRenderer>::New();
+     vtkSmartPointer<vtkRenderWindow> renderWindow = vtkSmartPointer<vtkRenderWindow>::New();
+     vtkSmartPointer<vtkRenderWindowInteractor> renderWindowInteractor = vtkSmartPointer<vtkRenderWindowInteractor>::New();
 
 
   //Add camera interactor
   vtkSmartPointer<vtkInteractorStyleTrackballCamera> style = vtkSmartPointer<vtkInteractorStyleTrackballCamera>::New();
   renderWindowInteractor->SetInteractorStyle(style);
   style->SetCurrentRenderer(renderer);
-
 
   vtkSmartPointer<vtkHedgeHog> hhog = vtkSmartPointer<vtkHedgeHog>::New();
   vtkSmartPointer<vtkPolyDataMapper> hhogMapper =  vtkSmartPointer<vtkPolyDataMapper>::New();
@@ -412,8 +435,10 @@ generatePoints(meshParams, points, verts, polyDataPoints, timeVector);
 
   polyDataPoints->GetPointData()->SetVectors(vectorField);
   polyDataPoints->GetPointData()->SetActiveScalars("Magnitudes");
+
   glyph3DMapper->SetLookupTable(colorLookupTable);
   glyph3DMapper->SetScalarRange(polyDataPoints->GetScalarRange());
+
   hhog->SetInputData(polyDataPoints);
   hhog->SetScaleFactor(0.001);
   hhog->Update();
@@ -424,11 +449,10 @@ generatePoints(meshParams, points, verts, polyDataPoints, timeVector);
   hhogActor->SetMapper(hhogMapper);
 
   glyph3D->SetInputData(polyDataPoints);
-  glyph3D->SetScaleFactor(0.001);
+  glyph3D->SetScaleFactor(0.01);
   glyph3D->SetColorModeToColorByVector();
   glyph3D->SetScaleModeToScaleByVector();
   glyph3D->OrientOn();
-
   glyph3D->Update();
 
   vtkSmartPointer<vtkActor> glyph3DActor = vtkSmartPointer<vtkActor>::New();
@@ -450,6 +474,7 @@ generatePoints(meshParams, points, verts, polyDataPoints, timeVector);
     renderer->AddActor(actorAxesOrigin);
  //   renderer->AddActor(hhogActor);
     renderer->AddActor(glyph3DActor);
+    renderer->AddActor(actorSpline);
     //Set Background color
     renderer->SetBackground(colors->GetColor3d("SlateGray").GetData());
     //Sets the window rendering process with the set renderer
@@ -462,8 +487,13 @@ generatePoints(meshParams, points, verts, polyDataPoints, timeVector);
     keypressCallback->SetCallback ( KeypressCallbackFunction );
     renderWindowInteractor->AddObserver ( vtkCommand::KeyPressEvent, keypressCallback );
 
-    CallBackParameters callbackParams(polyDataPoints, vectorField, timeVector, glyph3DMapper);
+
+
+    CallBackParameters callbackParams(polyDataPoints, vectorField, timeVector, glyph3DMapper,
+                                      spline, functionSource, pointsSpline, results);
+
     void* callBackArgums = static_cast<void*>(&callbackParams);
+
 
     //Initialize must be called prior to creating timer events.
     renderWindowInteractor->Initialize();
@@ -472,10 +502,10 @@ generatePoints(meshParams, points, verts, polyDataPoints, timeVector);
     timerCallback->SetClientData(callBackArgums);
     renderWindowInteractor->AddObserver ( vtkCommand::TimerEvent, timerCallback );
 
-  //Renders the window
-  renderWindow->Render();
-  //Starts the window interactor
-  renderWindowInteractor->Start();
+    //Renders the window
+    renderWindow->Render();
+    //Starts the window interactor
+    renderWindowInteractor->Start();
 
-  return EXIT_SUCCESS;
+    return EXIT_SUCCESS;
 }
