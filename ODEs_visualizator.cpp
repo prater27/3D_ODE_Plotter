@@ -232,8 +232,6 @@ for (uint i=0; i<results.size(); i++){
     }
 }
 
-cout << xMinMax[0] << "   " << xMinMax[1] << endl;
-
 for (uint i=0; i<results.size(); i++){
     if(i == 0){
         yMinMax[0] = results[i].pos[1];
@@ -247,22 +245,18 @@ for (uint i=0; i<results.size(); i++){
     }
 }
 
-cout << yMinMax[0] << "   " << yMinMax[1] << endl;
-
 for (uint i=0; i<results.size(); i++){
     if(i == 0){
         zMinMax[0] = results[i].pos[2];
         zMinMax[1] = results[i].pos[2];
     }
-    else if(results[i].pos[2] < xMinMax[0]){
+    else if(results[i].pos[2] < zMinMax[0]){
         zMinMax[0] = results[i].pos[2];
     }
-    else if(results[i].pos[2] > xMinMax[1]){
+    else if(results[i].pos[2] > zMinMax[1]){
         zMinMax[1] = results[i].pos[2];
     }
 }
-
-cout << zMinMax[0] << "   " << zMinMax[1] << endl;
 
 
 meshParams.nx = 10;
@@ -277,6 +271,7 @@ meshParams.zMin = 1.1*zMinMax[0];
 meshParams.xMax = 1.1*xMinMax[1];
 meshParams.yMax = 1.1*yMinMax[1];
 meshParams.zMax = 1.1*zMinMax[1];
+
 
 meshParams.tMin=0;
 meshParams.tMax=results.end()->t;
@@ -449,7 +444,7 @@ generatePoints(meshParams, points, verts, polyDataPoints, timeVector);
   hhogActor->SetMapper(hhogMapper);
 
   glyph3D->SetInputData(polyDataPoints);
-  glyph3D->SetScaleFactor(0.01);
+  glyph3D->SetScaleFactor(0.025);
   glyph3D->SetColorModeToColorByVector();
   glyph3D->SetScaleModeToScaleByVector();
   glyph3D->OrientOn();
