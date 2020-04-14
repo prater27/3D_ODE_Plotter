@@ -159,6 +159,8 @@
 #include <vtkArrowSource.h>
 #include <vtkLookupTable.h>
 
+#include <vtkExtractEnclosedPoints.h>
+#include <vtkCubeSource.h>
 
 struct ResultsLine{
     double t;

@@ -18,6 +18,7 @@ find_package(VTK COMPONENTS
   vtkRenderingCore
   vtkRenderingFreeType
   vtkRenderingGL2PSOpenGL2
+  vtkFiltersPoints
   vtkRenderingOpenGL2 QUIET)
 if (NOT VTK_FOUND)
   message("Skipping ODEs_visualizator: ${VTK_NOT_FOUND_MESSAGE}")
