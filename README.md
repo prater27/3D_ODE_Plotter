@@ -11,3 +11,8 @@ There is two branches. One draws the closest vectors to the current position/tim
 
 Some gifs of things that can be achieve with this tool are:
 
+![](gif1.gif)
+
+![](gif2.gif)
+
+![](gif3.gif)
