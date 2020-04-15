@@ -14,7 +14,6 @@ void KeypressCallbackFunction ( vtkObject* caller, long unsigned int vtkNotUsed(
   // Handle an arrow key
   if(pushed == ret && animStart==false)
   {
-        //startTime = std::chrono::steady_clock::now();
     //    iren->CreateOneShotTimer(1);
         iren->CreateRepeatingTimer(20);
         animStart=true;
@@ -101,9 +100,9 @@ vtkNew<vtkPolyData> generateCube(LocalCubeBounds localBounds){
 }
 
 void evaluateFunction(const double t, const double (&position)[3], double (&result)[3]){
-    result[0] = 10.0*(position[1] - position[0]);
-    result[1] = 28.0*position[0] - position[1]-position[0]*position[2];
-    result[2] = -(8.00/3.00)*position[2] + position[0]*position[1];
+    result[0] = 10.0*(position[1] - position[0])*cos(t)*(t+1)/(t+1);
+    result[1] = (28.0*position[0] - position[1]-position[0]*position[2])*sin(t)*(t+1)/(t+1);
+    result[2] = (-(8.00/3.00)*position[2] + position[0]*position[1])*log(log(t+1)+1)*(t+1)/(t+1);
 }
 
 
@@ -114,9 +113,6 @@ void getPositionsAroundSpline(const double (&posSpline)[3], const vtkSmartPointe
     vtkNew<vtkCubeSource> cube;
 
     LocalCubeBounds localBounds(meshParams, posSpline);
-    //cube->SetBounds(localBounds.xMin, localBounds.xMax, localBounds.yMin, localBounds.yMax,
-    //                localBounds.zMin, localBounds.zMax);
-    //cube->Update();
 
     extractor->SetInputData(polyDataPoints);
     extractor->SetSurfaceData(generateCube(localBounds));
@@ -136,8 +132,7 @@ void generateLocalVectorFieldAtT(const vtkSmartPointer<vtkPolyData>& polyDataPoi
         vtkSmartPointer<vtkDoubleArray> magnitudes = vtkSmartPointer<vtkDoubleArray>::New();
         vtkSmartPointer<vtkDoubleArray> magnitudesLocal = vtkSmartPointer<vtkDoubleArray>::New();
 
-      //  getPositionsAroundSpline(posSpline, polyDataPoints, polyDataPointsLocal, meshParams);//Esto es el original
-        polyDataPointsLocal->Reset();//Modificacion tangente solo
+        polyDataPointsLocal->Reset();//Modificacion para Vector tangente solo
         polyDataPointsLocal->GetPoints()->InsertNextPoint(posSpline);//Modificacion para Vector tangente solo
 
         vtkSmartPointer<vtkDoubleArray> vectorFieldLocal = vtkSmartPointer<vtkDoubleArray>::New();
@@ -161,22 +156,12 @@ void generateLocalVectorFieldAtT(const vtkSmartPointer<vtkPolyData>& polyDataPoi
             magnitudes->InsertValue(i,scalarResult);
         }
 
-   //     for (int i=0; i<polyDataPointsLocal->GetNumberOfPoints(); i++){
-  //          double result[3];
- //           double position[3];
-//
-//            polyDataPointsLocal->GetPoint(i, position);
-//
-//            evaluateFunction(t, position, result);
-//            vectorFieldLocal->InsertTuple3(i, result[0], result[1], result[2]);
-//            double scalarResult = sqrt((pow(result[0],2)+pow(result[1],2)+pow(result[2],2)));
-//            magnitudesLocal->InsertValue(i,scalarResult);
-//        }
-                    double result[3];
-                   evaluateFunction(t, posSpline, result);
-                    vectorFieldLocal->InsertTuple3(0, result[0], result[1], result[2]);
-                    double scalarResult = sqrt((pow(result[0],2)+pow(result[1],2)+pow(result[2],2)));
-                    magnitudesLocal->InsertValue(0,scalarResult);
+        //Code for just drawing the tangent vector
+        double result[3];
+        evaluateFunction(t, posSpline, result);
+        vectorFieldLocal->InsertTuple3(0, result[0], result[1], result[2]);
+        double scalarResult = sqrt((pow(result[0],2)+pow(result[1],2)+pow(result[2],2)));
+        magnitudesLocal->InsertValue(0,scalarResult);
 
         double scalarMagnitudes[2];
         polyDataPoints->GetPointData()->SetVectors(vectorField);
@@ -199,6 +184,7 @@ void generateLocalVectorFieldAtT(const vtkSmartPointer<vtkPolyData>& polyDataPoi
 }
 
 
+//Dibuja todo el campo vectorial
 void generateVectorFieldAtT(const vtkSmartPointer<vtkPolyData>& polyDataPoints,
                             const vtkSmartPointer<vtkDoubleArray>& vectorField, const double& t,
                             const vtkSmartPointer<vtkLookupTable>& colorLookupTable){
@@ -214,6 +200,7 @@ void generateVectorFieldAtT(const vtkSmartPointer<vtkPolyData>& polyDataPoints,
 
             polyDataPoints->GetPoint(i, position);
             evaluateFunction(t, position, result);
+
             vectorField->InsertTuple3(i, result[0], result[1], result[2]);
             double scalarResult = sqrt((pow(result[0],2)+pow(result[1],2)+pow(result[2],2)));
             magnitudes->InsertValue(i,scalarResult);
@@ -254,7 +241,6 @@ struct CallBackParameters{
     vtkSmartPointer<vtkPolyData> polyDataPoints;
     vtkSmartPointer<vtkDoubleArray> vectorField;
     std::vector<double> timeVector;
-    vtkSmartPointer<vtkPolyDataMapper> polyDataMapper;
 
     vtkSmartPointer<vtkParametricSpline> spline;
     vtkSmartPointer<vtkParametricFunctionSource> functionSource;
@@ -267,8 +253,7 @@ struct CallBackParameters{
 
 
     CallBackParameters(const vtkSmartPointer<vtkPolyData>& polyDataPoints_, const vtkSmartPointer<vtkDoubleArray>& vectorField_,
-                       const std::vector<double>& timeVector_, const vtkSmartPointer<vtkPolyDataMapper>& polyDataMapper_,
-                       const     vtkSmartPointer<vtkParametricSpline>& spline_,
+                       const std::vector<double>& timeVector_, const     vtkSmartPointer<vtkParametricSpline>& spline_,
                        const vtkSmartPointer<vtkParametricFunctionSource>& functionSource_,
                        const vtkSmartPointer<vtkPoints>& pointsSpline_, const std::vector<ResultsLine>& results_,
                        const vtkSmartPointer<vtkPolyData>& polyDataPointsLocal_, const MeshParameters& meshParams_,
@@ -276,7 +261,6 @@ struct CallBackParameters{
         polyDataPoints(polyDataPoints_),
         vectorField(vectorField_),
         timeVector(timeVector_),
-        polyDataMapper(polyDataMapper_),
         spline(spline_),
         functionSource(functionSource_),
         pointsSpline(pointsSpline_),
@@ -293,24 +277,26 @@ void TimerCallbackFunction ( vtkObject* caller, long unsigned int vtkNotUsed(eve
     vtkRenderWindowInteractor *iren = static_cast<vtkRenderWindowInteractor*>(caller);
 
 if(timePointsProcessedCounter<params->timeVector.size()){
-    updateSpline(params->results[timePointsProcessedCounter].pos, params->spline, params->functionSource,
-                 params->pointsSpline);
+//   draws the spline
+   updateSpline(params->results[timePointsProcessedCounter].pos, params->spline, params->functionSource,
+   params->pointsSpline);
 
     vtkSmartPointer<vtkLookupTable> colorLookupTable = vtkSmartPointer<vtkLookupTable>::New();
+//This is the original vector field
 //    generateVectorFieldAtT(params->polyDataPoints, params->vectorField,
 //                           params->timeVector[timePointsProcessedCounter], colorLookupTable);
 
+    //This part generates the "Tangent vector" highlighted effect
       generateLocalVectorFieldAtT(params->polyDataPoints, params->vectorField,
                              params->timeVector[timePointsProcessedCounter], colorLookupTable, params->polyDataPointsLocal,
                              params->results[timePointsProcessedCounter].pos, params->meshParams);
 
-    vtkSmartPointer<vtkTransform> transform = vtkSmartPointer<vtkTransform> ::New();
-    transform->RotateZ(0.5);
-    params->camera->ApplyTransform(transform);
+  //  vtkSmartPointer<vtkTransform> transform = vtkSmartPointer<vtkTransform> ::New();
+ //   transform->RotateZ(0.5);
+ //   params->camera->ApplyTransform(transform);
 
     iren->Render();
     timePointsProcessedCounter++;
- //   iren->CreateOneShotTimer(1);
 }
 }
 
@@ -401,9 +387,9 @@ int main(int argc, char* argv[])
             }
         }
 
-    meshParams.nx = 20;
-    meshParams.ny = 20;
-    meshParams.nz = 20;
+    meshParams.nx = 7;
+    meshParams.ny = 7;
+    meshParams.nz = 7;
     meshParams.nt = results.size();
 
     meshParams.xMin = 1.1*xMinMax[0];
@@ -416,7 +402,8 @@ int main(int argc, char* argv[])
 
 
     meshParams.tMin=0;
-    meshParams.tMax=results.end()->t;
+    meshParams.tMax=100;
+    //meshParams.tMax=results.end()->t;
 
 //It generates the mesh of spatial and temporal points
     generatePoints(meshParams, points, verts, polyDataPoints, timeVector);
@@ -546,7 +533,7 @@ int main(int argc, char* argv[])
 
     polyDataPoints->GetPointData()->SetVectors(vectorField);
     polyDataPoints->GetPointData()->SetActiveScalars("Magnitudes");
-
+/**
 //HedgeHog
     vtkSmartPointer<vtkHedgeHog> hhog = vtkSmartPointer<vtkHedgeHog>::New();
     vtkSmartPointer<vtkPolyDataMapper> hhogMapper =  vtkSmartPointer<vtkPolyDataMapper>::New();
@@ -567,7 +554,7 @@ int main(int argc, char* argv[])
     hhogMapper->Update();
 
     hhogActor->SetMapper(hhogMapper);
-
+*/
 //Glyph3D
     vtkSmartPointer<vtkArrowSource> arrowSource = vtkSmartPointer<vtkArrowSource>::New();
     vtkSmartPointer<vtkGlyph3D> glyph3D = vtkSmartPointer<vtkGlyph3D>::New();
@@ -592,7 +579,7 @@ int main(int argc, char* argv[])
     glyph3DMapper->Update();
 
     glyph3DActor->SetMapper(glyph3DMapper);
-    glyph3DActor->GetProperty()->SetOpacity(0.05);
+    glyph3DActor->GetProperty()->SetOpacity(0.025);
 
 
 //Glyph3D Local points
@@ -661,7 +648,7 @@ int main(int argc, char* argv[])
     //renderer->AddActor(actorPlaneXZ);
     //renderer->AddActor(actorPlaneYZ);
     //renderer->AddActor(hhogActor);
-    //renderer->AddActor(glyph3DActor);
+    renderer->AddActor(glyph3DActor);
     renderer->AddActor(glyph3DLocalActor);
     //renderer->AddActor(actorAxesOrigin);
     renderer->AddActor(actorSpline);
@@ -681,8 +668,8 @@ int main(int argc, char* argv[])
 //    CallBackParameters callbackParams(polyDataPoints, vectorField, timeVector, glyph3DMapper,
 //                                      spline, functionSource, pointsSpline, results);
 
-    CallBackParameters callbackParams(polyDataPoints, vectorField, timeVector, hhogMapper,
-                                      spline, functionSource, pointsSpline, results, polyDataPointsLocal, meshParams, camera);
+    CallBackParameters callbackParams(polyDataPoints, vectorField, timeVector, 
+					spline, functionSource, pointsSpline, results, polyDataPointsLocal, meshParams, camera);
     void* callBackArgums = static_cast<void*>(&callbackParams);
 
     //Initialize must be called prior to creating timer events
